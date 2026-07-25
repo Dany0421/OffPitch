@@ -104,7 +104,7 @@ const World = (() => {
         _py = Math.max(20, Math.min(WorldMap.H - 20, p.y));
         _face = WorldLogic.facing(v.x, v.y, _face);
         const z = WorldLogic.hitZone(_px, _py, { w: PLAYER.feetW, h: PLAYER.feetH }, _doors());
-        if (z && !_doorZone) Panels.open(z.id);
+        if (z && !_doorZone) World.openBuilding(z.id, z);
         _doorZone = z;
       }
     }
@@ -281,20 +281,147 @@ const World = (() => {
     _canvas.height = window.innerHeight;
   }
 
-  // The 2D world's own state around a panel visit. Panels knows none of this:
-  // it calls back here so the sprite can be put down at the door again.
+  // Fase 2 mapping: Hub tabs split by location (no more full-Hub duplicate).
+  // Events tab lives at the plaza notice board; Players moves to Balneário in Fase 3.
+  // career tab moved to the Agência in Fase 4 (transfer/career territory)
+  const HUB_VIEWS = {
+    board: { title: 'Boardroom', tabs: ['tracker', 'rulebook', 'archive'] },
+  };
+  const MAPPING = {
+    casa:          { custom: () => WorldCasa.render(document.getElementById('world-generic')) },
+    balneario:     { custom: () => WorldBalneario.render(document.getElementById('world-generic')) },
+    'club-office': { custom: () => WorldOffice.render(document.getElementById('world-generic')) },
+    boardroom:     { panels: [['ruleset', 'Ruleset', () => RulesetModule.render()],
+                              ['hub', 'Boardroom', () => HubModule.render(HUB_VIEWS.board)]] },
+    quadro:        { custom: () => WorldBoard.render(document.getElementById('world-generic')) },
+    estadio:       { custom: () => WorldStadium.render(document.getElementById('world-generic')) },
+    sponsors:      { custom: () => WorldSponsors.render(document.getElementById('world-generic')) },
+    imprensa:      { custom: () => WorldImprensa.render(document.getElementById('world-generic')) },
+    agencia:       { custom: () => WorldAgencia.render(document.getElementById('world-generic')) },
+  };
   let _returnPos = null;
+  // Location home (chooser / custom front page) — lets sub-panels go back to
+  // the location menu instead of forcing a round-trip through the city.
+  let _locHome = null;
 
-  function _onPanelOpen(id, building) {
-    _inOverlay = true;
-    _returnPos = building
-      ? { x: building.door.x + building.door.w / 2,
-          y: building.door.y + building.door.h + 18 }
-      : null;
+  function _menuBtn(show) {
+    const btn = document.getElementById('world-menu-btn');
+    if (show && _locHome) {
+      btn.textContent = `← ${_locHome.label}`;
+      btn.classList.remove('world-hidden');
+    } else {
+      btn.classList.add('world-hidden');
+    }
   }
 
-  function _onPanelClose() {
+  function _clearPanels() {
+    document.querySelectorAll('#world-overlay .module-panel')
+      .forEach(p => p.classList.remove('active'));
+  }
+
+  function _showPanel(name, renderFn) {
+    _clearPanels();
+    const panel = document.getElementById(`module-${name}`);
+    panel.classList.add('active');
+    renderFn();
+    if (window.lucide) lucide.createIcons();
+    document.getElementById('world-overlay').scrollTop = 0;
+    _menuBtn(!!_locHome);
+  }
+
+  function _showConstruction(label) {
+    const panel = document.getElementById('world-generic');
+    while (panel.firstChild) panel.removeChild(panel.firstChild);
+    const wrap = document.createElement('div');
+    wrap.className = 'world-construction';
+    const h = document.createElement('h2');
+    h.textContent = label;
+    const p = document.createElement('p');
+    p.textContent = 'Em construção — chega numa fase seguinte.';
+    wrap.append(h, p);
+    panel.appendChild(wrap);
+    _clearPanels();
+    panel.classList.add('active');
+  }
+
+  function _showChooser(label, panels) {
+    const panel = document.getElementById('world-generic');
+    while (panel.firstChild) panel.removeChild(panel.firstChild);
+    const wrap = document.createElement('div');
+    wrap.className = 'world-chooser';
+    for (const [name, title, renderFn] of panels) {
+      const btn = document.createElement('button');
+      btn.className = 'btn-primary';
+      btn.textContent = title;
+      btn.addEventListener('click', () => _showPanel(name, renderFn));
+      wrap.appendChild(btn);
+    }
+    panel.appendChild(wrap);
+    _clearPanels();
+    panel.classList.add('active');
+  }
+
+  // Restyle: each building dresses the overlay in its own theme class.
+  function _setTheme(id) {
+    const ov = document.getElementById('world-overlay');
+    for (const c of [...ov.classList]) if (c.startsWith('theme-')) ov.classList.remove(c);
+    const cls = (typeof WorldTheme !== 'undefined') && WorldTheme.THEMES[id];
+    if (cls) ov.classList.add(cls);
+  }
+
+  function _openOverlayChrome() {
+    _inOverlay = true;
+    document.getElementById('world-overlay').classList.add('open');
+    document.getElementById('world-back-btn').classList.remove('world-hidden');
+    document.getElementById('world-actions').classList.add('world-hidden');
+  }
+
+  // Setup lives outside the city (pre-world flow) — dedicated button, no door.
+  function openSetup() {
+    _returnPos = null;
+    _locHome = null;
+    _openOverlayChrome();
+    _setTheme(null);
+    _showPanel('setup', () => SetupModule.render());
+  }
+
+  function _showCustom(m) {
+    _clearPanels();
+    m.custom();
+    document.getElementById('world-generic').classList.add('active');
+    if (window.lucide) lucide.createIcons();
+    document.getElementById('world-overlay').scrollTop = 0;
+    _menuBtn(false);
+  }
+
+  function openBuilding(id) {
+    const b = WorldMap.buildings.find(x => x.id === id)
+      || WorldMap.props.find(p => p.id === id);
+    _returnPos = { x: b.door.x + b.door.w / 2, y: b.door.y + b.door.h + 18 };
+    _openOverlayChrome();
+    _setTheme(id);
+    _locHome = null;
+    const m = MAPPING[id];
+    if (!m) _showConstruction(b.label);
+    else if (m.custom) {
+      _locHome = { label: b.label, show: () => _showCustom(m) };
+      _showCustom(m);
+    }
+    else if (m.panels.length === 1) _showPanel(m.panels[0][0], m.panels[0][2]);
+    else {
+      _locHome = { label: b.label, show: () => _showChooser(b.label, m.panels) };
+      _showChooser(b.label, m.panels);
+    }
+  }
+
+  function closeOverlay() {
     _inOverlay = false;
+    document.getElementById('world-overlay').classList.remove('open');
+    _setTheme(null);
+    document.getElementById('world-back-btn').classList.add('world-hidden');
+    document.getElementById('world-actions').classList.remove('world-hidden');
+    _locHome = null;
+    _menuBtn(false);
     if (_returnPos) { _px = _returnPos.x; _py = _returnPos.y; _persist(); }
     _doorZone = null;
     // club may have changed inside (Setup edit, transfer) — retint if so
@@ -321,7 +448,11 @@ const World = (() => {
     ChallengesModule.init(document.getElementById('module-challenges'));
     RulesetModule.init(document.getElementById('module-ruleset'));
     HubModule.init(document.getElementById('module-hub'));
-    Panels.init({ onOpen: _onPanelOpen, onClose: _onPanelClose });
+    document.getElementById('world-back-btn').addEventListener('click', closeOverlay);
+    document.getElementById('world-setup-btn').addEventListener('click', openSetup);
+    document.getElementById('world-menu-btn').addEventListener('click', () => {
+      if (_locHome) _locHome.show();
+    });
     App.initChrome();
     if (window.lucide) lucide.createIcons();
     _restore();
@@ -329,11 +460,12 @@ const World = (() => {
     requestAnimationFrame(ts => { _last = ts; _frame(ts); });
     // pre-world gate (spec): the city only makes sense with a save — a fresh
     // browser lands straight in Setup (API key lives in Settings, top-right)
-    if (!Storage.get(Storage.KEYS.SETUP)?.club) Panels.openSetup();
+    if (!Storage.get(Storage.KEYS.SETUP)?.club) openSetup();
   }
 
-  const api = { init,
+  const api = { init, openBuilding, openSetup, closeOverlay,
     setClubColors, refreshClubColors,
+    _navHook: () => _menuBtn(!!_locHome),
     setSpeed: v => { _speed = v || SPEED; _persist(); },
     _setOverlay: v => { _inOverlay = v; }, _pos: () => ({ x: _px, y: _py }),
     _moveTo: (x, y) => { _px = x; _py = y; _persist(); } };

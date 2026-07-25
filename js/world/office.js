@@ -35,7 +35,7 @@ const WorldOffice = (() => {
     const editBtn = document.createElement('button');
     editBtn.className = 'btn-ghost office-edit-btn';
     editBtn.textContent = 'Editar no Setup';
-    editBtn.addEventListener('click', () => Panels.openSetup());
+    editBtn.addEventListener('click', () => World.openSetup());
     head.appendChild(editBtn);
     card.appendChild(head);
 
