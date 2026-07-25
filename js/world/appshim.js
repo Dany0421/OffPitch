@@ -13,7 +13,7 @@ const App = (() => {
     if (name === 'hub') HubModule.render();
     document.getElementById('world-overlay').scrollTop = 0;
     // sub-panel opened from a location home → show the "back to menu" button
-    if (typeof World !== 'undefined' && World._navHook) World._navHook();
+    if (typeof Panels !== 'undefined') Panels.navHook();
   }
 
   function setMode() {} // no fiction nav tab in the world entry
@@ -94,7 +94,10 @@ const App = (() => {
     const cc = Storage.get(Storage.KEYS.WORLD)?.clubColors;
     if (cc?.primary) priIn.value = cc.primary;
     if (cc?.secondary) secIn.value = cc.secondary;
+    // World is absent in the 3D entry (panel.html), where the city is Unreal's
+    // and these two only ever tinted 2D sprites.
     const applyColors = () => {
+      if (typeof World === 'undefined') return;
       World.setClubColors(priIn.value, secIn.value);
       _toast('Cores do clube atualizadas', null, false);
     };
@@ -105,8 +108,10 @@ const App = (() => {
       btn.disabled = true;
       btn.textContent = 'A perguntar…';
       try {
-        await World.refreshClubColors();
-        _toast('Cores do clube regeneradas', null, false);
+        if (typeof World !== 'undefined') {
+          await World.refreshClubColors();
+          _toast('Cores do clube regeneradas', null, false);
+        }
       } catch (err) {
         _toast(err.message, null, true);
       }
@@ -117,6 +122,13 @@ const App = (() => {
     const speedSel = document.getElementById('settings-world-speed');
     speedSel.value = String(Storage.get(Storage.KEYS.WORLD)?.speed || 220);
     speedSel.addEventListener('change', () => {
+      // TODO 3D: in panel.html there is no World, and the pace lives in the
+      // Unreal character. Until that is wired, say so instead of claiming a
+      // change that did not happen.
+      if (typeof World === 'undefined') {
+        _toast('A velocidade no 3D ainda muda-se com Tab, não aqui', null, true);
+        return;
+      }
       World.setSpeed(parseInt(speedSel.value));
       _toast('Velocidade atualizada', null, false);
     });
