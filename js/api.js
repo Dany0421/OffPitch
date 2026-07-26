@@ -435,6 +435,12 @@ Return ONLY the JSON object. No preamble, no explanation, no markdown fences.`;
         const identity = fp;
         const psLine = (fp.play_styles || []).join(', ') || '—';
         const pspLine = (fp.play_styles_plus || []).join(', ') || '—';
+        // The possible ones travel with the active ones on purpose. Without
+        // them the model only knows what the player HAS, so when a prompt lets
+        // it grant a playstyle it picks blind — and hands back one already
+        // active, which reads as a bug to anyone holding the card.
+        const possLine = (fp.possible_play_styles || []).join(', ') || '—';
+        const possPlusLine = (fp.possible_play_styles_plus || []).join(', ') || '—';
         parts.push(
           `FICTION PLAYER FIFA CARD:\n` +
           `${identity.height || '—'}cm | ${identity.weight || '—'}kg | ${identity.preferred_foot || '—'} foot | Weak Foot ${identity.weak_foot || '—'}★ | Skill Moves ${identity.skill_moves || '—'}★\n` +
@@ -447,7 +453,9 @@ Return ONLY the JSON object. No preamble, no explanation, no markdown fences.`;
               `Dribbling: BC ${s.ball_control||'—'} | Drib ${s.dribbling||'—'} | Agi ${s.agility||'—'} | Bal ${s.balance||'—'} | Cmp ${s.composure||'—'}\n` +
               `Defending: DA ${s.defensive_awareness||'—'} | Int ${s.interceptions||'—'} | Hd ${s.heading_accuracy||'—'} | Tck ${s.standing_tackle||'—'}\n` +
               `Physical: Sta ${s.stamina||'—'} | Str ${s.strength||'—'} | Jmp ${s.jumping||'—'} | Agg ${s.aggression||'—'}`) + `\n` +
-          `PlayStyles: ${psLine} | PS+: ${pspLine}`
+          `PlayStyles ACTIVE (he already has these): ${psLine} | PS+: ${pspLine}\n` +
+          `PlayStyles POSSIBLE (not unlocked yet — the only ones grantable): ` +
+          `${possLine} | PS+: ${possPlusLine}`
         );
       }
     }
@@ -929,6 +937,8 @@ The user has Live Editor:
 ✅ Can change: OVR, individual attributes, potential, weak foot stars (1-5), skill moves stars (1-5), playstyles, force transfers
 ❌ Cannot control: minutes played, starting lineups, match frequency
 
+PLAYSTYLES: a reward may unlock one only from "PlayStyles POSSIBLE" in the context, never one under "PlayStyles ACTIVE" — the player already has those and the user sees it on his card. A punishment may remove one he HAS. If no possible styles are listed, use attributes or stars instead.
+
 DESCRIPTION LENGTH: MAX 4 LINES per challenge. Tight, direct, specific. No walls of text.
 
 CALIBRATION — NUMBERS MUST BE REALISTIC FOR THE RATINGS IN CONTEXT:
@@ -1008,7 +1018,8 @@ RULES:
 - Example negative: "Fitness concerns raised — freeze his Pace attribute for 4 matches (Live Editor)"
 - Example negative: "Falling out with the manager — reduce potential by 3 pts until next window (Live Editor)"
 - Example positive: "Breakthrough performance catches eye — boost his highest attribute by 2 pts (Live Editor)"
-- Example positive: "International call-up reward — add any one playstyle (Live Editor)"
+- Example positive: "International call-up reward — unlock Finesse Shot (Live Editor)"
+- PLAYSTYLES: if an event unlocks one, NAME it, and name one from "PlayStyles POSSIBLE" in the context. NEVER one listed under "PlayStyles ACTIVE" — telling the user to activate a style his player already has is a contradiction he sees instantly on the card. If the context lists no possible styles, do not write a playstyle event at all.
 - Do NOT repeat any past event (list provided if applicable)
 - If the context includes a LINKED PLAYER, 2-3 of the 10 events must involve the duo (his form, injury, contract, or the bond itself) — but any Live Editor change in those events applies to the USER's player only, never to the linked player's attributes
 
