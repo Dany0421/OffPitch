@@ -2083,15 +2083,24 @@ const HubModule = (() => {
       + (t.clubs.length ? ' · ' + t.clubs.join(' → ') : '');
     card.appendChild(sub);
 
+    // Same split the season form uses: a keeper fills in Clean Sheets, an
+    // outfield player fills in Goals and Assists. Showing all of them would
+    // print "Goals 0, Assists 0, G+A 0" on a keeper's whole career, and
+    // "Clean sheets 0" on a striker's -- zeros that mean nothing.
+    const setup = Storage.get(Storage.KEYS.SETUP);
+    const isGK = (setup?.player?.position || '').toUpperCase() === 'GK'
+      || !!(Storage.get(Storage.KEYS.FICTION_PLAYER)?.is_gk);
+
     const grid = document.createElement('div');
     grid.className = 'player-stats-grid';
     [
       ['Apps',      t.apps],
-      ['Goals',     t.goals],
-      ['Assists',   t.assists],
-      ['G+A',       t.contributions],
-      ['Clean sheets', t.cleanSheets],
-      ['G+A / game', t.perGame],
+      ...(isGK
+        ? [['Clean sheets', t.cleanSheets]]
+        : [['Goals',   t.goals],
+           ['Assists', t.assists],
+           ['G+A',     t.contributions],
+           ['G+A / game', t.perGame]]),
       ['Avg rating', t.avgRating],
       ['Trophies',  t.trophies],
     ].forEach(([label, value]) => {
@@ -2145,19 +2154,22 @@ const HubModule = (() => {
     // Season by season, so the progression is readable and not just a total.
     const tabela = document.createElement('div');
     tabela.className = 'career-table';
+    const classeLinha = 'career-row' + (isGK ? ' career-row-gk' : '');
     const cab = document.createElement('div');
-    cab.className = 'career-row career-row-head';
-    ['Season', 'Club', 'Apps', 'G', 'A', 'Trophies'].forEach(h => {
-      const c = document.createElement('span');
-      c.textContent = h;
-      cab.appendChild(c);
-    });
+    cab.className = classeLinha + ' career-row-head';
+    ['Season', 'Club', 'Apps', ...(isGK ? ['CS'] : ['G', 'A']), 'Trophies']
+      .forEach(h => {
+        const c = document.createElement('span');
+        c.textContent = h;
+        cab.appendChild(c);
+      });
     tabela.appendChild(cab);
     t.rows.forEach(r => {
       const linha = document.createElement('div');
-      linha.className = 'career-row';
-      [`S${r.season}`, r.club || '—', r.apps || '—', r.goals || '—',
-       r.assists || '—', r.trophies.length || '—'].forEach(v => {
+      linha.className = classeLinha;
+      [`S${r.season}`, r.club || '—', r.apps || '—',
+       ...(isGK ? [r.cleanSheets || '—'] : [r.goals || '—', r.assists || '—']),
+       r.trophies.length || '—'].forEach(v => {
         const c = document.createElement('span');
         c.textContent = v;
         linha.appendChild(c);
