@@ -3247,3 +3247,45 @@ a { color: var(--accent); text-decoration: none; }
   flex-shrink: 0;
 }
 .chat-send-btn svg { width: 18px; height: 18px; }
+
+/* ── Career totals ──────────────────────────────────────────────
+   The Career card at the top of the Trophy Cabinet, in player and
+   fiction modes. Reuses .card, .player-stats-grid, .trophy-meta-label
+   and .badge so it reads as part of the cabinet and not as a new
+   screen bolted on. */
+.career-card { margin-bottom: 16px; }
+.career-sub {
+  color: var(--text-muted);
+  font-size: .8125rem;
+  margin: 2px 0 12px;
+}
+.career-stat-value {
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+.career-trophies { margin-top: 12px; }
+.career-table {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  /* A long career scrolls sideways instead of squashing the columns. */
+  overflow-x: auto;
+}
+.career-row {
+  display: grid;
+  grid-template-columns: 64px minmax(96px, 1fr) 56px 44px 44px 72px;
+  gap: 8px;
+  padding: 7px 0;
+  font-size: .8125rem;
+  border-bottom: 1px solid var(--border);
+  min-width: 380px;
+}
+.career-row:last-child { border-bottom: none; }
+.career-row span:not(:nth-child(2)) { text-align: right; }
+.career-row-head {
+  color: var(--text-muted);
+  font-size: .6875rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}

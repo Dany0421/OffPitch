@@ -1984,12 +1984,204 @@ const HubModule = (() => {
     _saveHub(hub);
   }
 
+  // ── Career totals ────────────────────────────────────────────
+  //
+  // Only for the player you are playing as, which is why this lives behind
+  // _isPlayerMode(): in manager mode there is no "my player" to total up.
+  //
+  // Nothing new is stored. Every number here already exists — each season
+  // entry carries playerStats.competitions with apps/goals/assists/cleanSheets,
+  // and advanceSeason never clears hub.seasons, so the seasons accumulate for
+  // the whole career. This just adds them up, which means it also works on a
+  // save that is already halfway through.
+
+  function _num(v) {
+    const n = typeof v === 'string' ? parseInt(v, 10) : v;
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function _careerTotals(seasons) {
+    const t = {
+      seasons: 0, clubs: [], apps: 0, goals: 0, assists: 0, cleanSheets: 0,
+      trophies: 0, byTrophy: {}, rows: [],
+      ovrStart: null, ovrEnd: null, potential: null,
+      _ratingSum: 0, _ratingApps: 0,
+    };
+
+    seasons.forEach(s => {
+      const ps    = s.playerStats || {};
+      const comps = ps.competitions || [];
+      const won   = Object.entries(s.trophies || {})
+        .filter(([, v]) => v).map(([k]) => k);
+
+      const row = {
+        season: s.season, club: s.club || '',
+        apps: 0, goals: 0, assists: 0, cleanSheets: 0, trophies: won,
+      };
+      comps.forEach(c => {
+        row.apps        += _num(c.apps);
+        row.goals       += _num(c.goals);
+        row.assists     += _num(c.assists);
+        row.cleanSheets += _num(c.cleanSheets);
+        // Average rating is weighted by appearances: a 9.0 over two games
+        // must not count the same as a 7.2 over thirty.
+        const ap = _num(c.apps), r = parseFloat(c.avgRating);
+        if (ap > 0 && Number.isFinite(r)) {
+          t._ratingSum  += r * ap;
+          t._ratingApps += ap;
+        }
+      });
+
+      // A season counts as played once it has any number or any trophy in it.
+      const tocado = row.apps || row.goals || row.assists || won.length
+        || ps.ovrEnd != null;
+      if (!tocado) return;
+
+      t.seasons++;
+      t.apps        += row.apps;
+      t.goals       += row.goals;
+      t.assists     += row.assists;
+      t.cleanSheets += row.cleanSheets;
+      t.trophies    += won.length;
+      won.forEach(n => { t.byTrophy[n] = (t.byTrophy[n] || 0) + 1; });
+      if (s.club && !t.clubs.includes(s.club)) t.clubs.push(s.club);
+
+      if (ps.ovrStart != null && t.ovrStart == null) t.ovrStart = _num(ps.ovrStart);
+      if (ps.ovrEnd   != null) t.ovrEnd = _num(ps.ovrEnd);
+      if (ps.potential != null) {
+        t.potential = Math.max(t.potential || 0, _num(ps.potential));
+      }
+      t.rows.push(row);
+    });
+
+    t.contributions = t.goals + t.assists;
+    t.avgRating = t._ratingApps
+      ? (t._ratingSum / t._ratingApps).toFixed(2) : null;
+    t.perGame = t.apps
+      ? ((t.goals + t.assists) / t.apps).toFixed(2) : null;
+    t.best = t.rows.reduce(
+      (a, b) => (b.goals + b.assists) > (a ? a.goals + a.assists : -1) ? b : a,
+      null);
+    return t;
+  }
+
+  function _buildCareerCard(seasons) {
+    const t = _careerTotals(seasons);
+    if (!t.seasons) return null;   // nothing recorded yet: no empty card
+
+    const card = document.createElement('div');
+    card.className = 'card career-card';
+
+    const title = document.createElement('div');
+    title.className = 'trophy-season-label';
+    title.textContent = 'Career';
+    card.appendChild(title);
+
+    const sub = document.createElement('div');
+    sub.className = 'career-sub';
+    sub.textContent = t.seasons + (t.seasons === 1 ? ' season' : ' seasons')
+      + (t.clubs.length ? ' · ' + t.clubs.join(' → ') : '');
+    card.appendChild(sub);
+
+    const grid = document.createElement('div');
+    grid.className = 'player-stats-grid';
+    [
+      ['Apps',      t.apps],
+      ['Goals',     t.goals],
+      ['Assists',   t.assists],
+      ['G+A',       t.contributions],
+      ['Clean sheets', t.cleanSheets],
+      ['G+A / game', t.perGame],
+      ['Avg rating', t.avgRating],
+      ['Trophies',  t.trophies],
+    ].forEach(([label, value]) => {
+      if (value == null || value === '') return;
+      const g = document.createElement('div');
+      g.className = 'trophy-meta-group';
+      const v = document.createElement('div');
+      v.className = 'career-stat-value';
+      v.textContent = value;
+      const l = document.createElement('div');
+      l.className = 'trophy-meta-label';
+      l.textContent = label;
+      g.appendChild(v);
+      g.appendChild(l);
+      grid.appendChild(g);
+    });
+    card.appendChild(grid);
+
+    if (t.ovrStart != null || t.ovrEnd != null) {
+      const ovr = document.createElement('div');
+      ovr.className = 'career-sub';
+      const partes = [];
+      if (t.ovrStart != null && t.ovrEnd != null) {
+        partes.push(`OVR ${t.ovrStart} → ${t.ovrEnd}`
+          + (t.ovrEnd > t.ovrStart ? ` (+${t.ovrEnd - t.ovrStart})` : ''));
+      } else if (t.ovrEnd != null) {
+        partes.push('OVR ' + t.ovrEnd);
+      }
+      if (t.potential != null) partes.push('potential ' + t.potential);
+      if (t.best && (t.best.goals + t.best.assists) > 0) {
+        partes.push(`best season S${t.best.season}`
+          + ` (${t.best.goals}G ${t.best.assists}A)`);
+      }
+      ovr.textContent = partes.join(' · ');
+      card.appendChild(ovr);
+    }
+
+    const nomes = Object.keys(t.byTrophy);
+    if (nomes.length) {
+      const row = document.createElement('div');
+      row.className = 'history-trophies career-trophies';
+      nomes.sort((a, b) => t.byTrophy[b] - t.byTrophy[a]).forEach(n => {
+        const b = document.createElement('span');
+        b.className = 'badge badge-completed';
+        b.textContent = t.byTrophy[n] > 1 ? `${n} ×${t.byTrophy[n]}` : n;
+        row.appendChild(b);
+      });
+      card.appendChild(row);
+    }
+
+    // Season by season, so the progression is readable and not just a total.
+    const tabela = document.createElement('div');
+    tabela.className = 'career-table';
+    const cab = document.createElement('div');
+    cab.className = 'career-row career-row-head';
+    ['Season', 'Club', 'Apps', 'G', 'A', 'Trophies'].forEach(h => {
+      const c = document.createElement('span');
+      c.textContent = h;
+      cab.appendChild(c);
+    });
+    tabela.appendChild(cab);
+    t.rows.forEach(r => {
+      const linha = document.createElement('div');
+      linha.className = 'career-row';
+      [`S${r.season}`, r.club || '—', r.apps || '—', r.goals || '—',
+       r.assists || '—', r.trophies.length || '—'].forEach(v => {
+        const c = document.createElement('span');
+        c.textContent = v;
+        linha.appendChild(c);
+      });
+      tabela.appendChild(linha);
+    });
+    card.appendChild(tabela);
+
+    return card;
+  }
+
   // ── Trophy Cabinet ───────────────────────────────────────────
 
   function _buildTrophies() {
     const hub     = _getHub();
     const seasons = hub.seasons || [];
     const wrap    = document.createElement('div');
+
+    // Career totals sit on top of the cabinet, and only where there is a
+    // player of your own to total up.
+    if (_isPlayerMode()) {
+      const carreira = _buildCareerCard(seasons);
+      if (carreira) wrap.appendChild(carreira);
+    }
 
     const addBtn = document.createElement('button');
     addBtn.className = 'btn-accent-ghost';
@@ -2466,5 +2658,11 @@ const HubModule = (() => {
     return s[(v - 20) % 10] || s[v] || s[0];
   }
 
+  // Exposed for the tests only, like challenges.js does: _careerTotals is
+  // pure arithmetic over the season list and is worth pinning down, because
+  // a wrong total is the kind of thing that looks plausible forever.
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { careerTotals: _careerTotals };
+  }
   return { init, render };
 })();
