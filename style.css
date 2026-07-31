@@ -3019,6 +3019,26 @@ a { color: var(--accent); text-decoration: none; }
 }
 .fiction-stat-editable { cursor: pointer; }
 .fiction-stat-editable:active { opacity: 0.7; }
+/* Valor + caixa de edicao + botao de sortear, agrupados a direita da linha. */
+.fiction-stat-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Discreto de proposito: acompanha cada stat, sao trinta deles no cartao, e a
+   trinta botoes chamativos o cartao passa a ser uma botoeira. */
+.fiction-stat-random {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1;
+  opacity: 0.55;
+}
+.fiction-stat-random:hover { opacity: 1; color: var(--accent); }
+.fiction-stat-random:active { transform: rotate(180deg); }
 .fiction-stat-input {
   display: none;
   width: 44px;

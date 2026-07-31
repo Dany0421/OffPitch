@@ -1,6 +1,38 @@
 const FictionModule = (() => {
   let _container = null;
 
+  // Um número de stat ao calhas, 1 a 99 inclusive.
+  //
+  // Math.floor(random() * 99) + 1 e não * 100: com 100 saía 1 a 100, e o 100
+  // não existe nesta escala. O erro de um ao lado é o que estas contas fazem
+  // sempre, e num stat ninguém repara — só se vê no dia em que aparece um 100
+  // num sítio que só vai até 99.
+  function sorteiaStat() {
+    return Math.floor(Math.random() * 99) + 1;
+  }
+
+  // O botão de sortear que acompanha cada stat.
+  //
+  // Por stat e não um "sortear tudo": o que se quer é mexer num valor sem
+  // inventar o jogador inteiro por baixo.
+  //
+  // stopPropagation não é enfeite. O valor ao lado abre o editor ao ser
+  // clicado, e sem isto o clique no botão sorteava E abria a caixa de texto por
+  // cima do número novo.
+  function _botaoRandom(aplicar) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'fiction-stat-random';
+    b.textContent = '⟳';
+    b.title = 'Sortear 1-99';
+    b.setAttribute('aria-label', 'Sortear entre 1 e 99');
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      aplicar(sorteiaStat());
+    });
+    return b;
+  }
+
   const STAT_GROUPS = [
     { label: 'Pace',     keys: ['acceleration','sprint_speed'] },
     { label: 'Shooting', keys: ['finishing','shot_power','long_shots','volleys','penalties','attacking_positioning'] },
@@ -214,6 +246,10 @@ const FictionModule = (() => {
       wrap.appendChild(lbl);
       wrap.appendChild(valEl);
       wrap.appendChild(input);
+      // Passa pelo commit e não escreve directamente: assim o sorteio usa o
+      // mesmo caminho da edição à mão -- limite, cor, e gravação -- em vez de
+      // ter uma segunda cópia dessas três coisas para divergir.
+      wrap.appendChild(_botaoRandom(v => { input.value = v; commit(); }));
       return wrap;
     }
 
@@ -530,9 +566,18 @@ const FictionModule = (() => {
           }
         });
 
+        // Valor, caixa de edição e botão juntos à direita. A linha é
+        // space-between: com os três soltos, o nome ia para um canto, o valor
+        // para o meio e o botão para o outro, e deixava de se ler como uma
+        // linha de stat.
+        const direita = document.createElement('span');
+        direita.className = 'fiction-stat-right';
+        direita.appendChild(valEl);
+        direita.appendChild(input);
+        direita.appendChild(_botaoRandom(v => { input.value = v; commit(); }));
+
         row.appendChild(nameEl);
-        row.appendChild(valEl);
-        row.appendChild(input);
+        row.appendChild(direita);
         grid.appendChild(row);
       });
 
@@ -845,5 +890,7 @@ const FictionModule = (() => {
     }
   }
 
-  return { init, render };
+  return { init, render, sorteiaStat };
 })();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = FictionModule;
