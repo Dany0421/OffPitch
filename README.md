@@ -51,3 +51,4 @@ Vanilla JavaScript (IIFE modules, no frameworks, no build step), HTML5 canvas, `
 
 - Requires an Anthropic API key; generation costs depend on the model picked in Settings.
 - This is a personal fan project for a single player's career saves. Not affiliated with EA, the clubs or leagues referenced, or any real person mentioned in generated content.
+- OffPitch 3D coming...
